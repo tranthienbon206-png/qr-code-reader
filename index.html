@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QR Code Reader - Đọc mã QR trực tuyến</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f8fafc;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #2563eb;
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+        #reader {
+            width: 100%;
+            border: none !important;
+        }
+
+        #reader video {
+            border-radius: 12px;
+        }
+
+        #reader img {
+            display: none;
+        }
+
+        #reader__scan_region {
+            background: #f8fafc;
+            border-radius: 12px;
+        }
+
+        #reader__dashboard_section_csr button {
+            background: #2563eb;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 9px 15px;
+            margin: 5px;
+            cursor: pointer;
+        }
+
+        #reader__dashboard_section_csr select {
+            border: 1px solid #d1d5db;
+            padding: 8px;
+            border-radius: 8px;
+            margin: 5px;
+        }
+    </style>
+</head>
+
+<body class="min-h-screen text-gray-800">
+
+    <header class="bg-white border-b">
+        <div class="max-w-5xl mx-auto px-5 py-5">
+            <h1 class="text-2xl font-bold text-blue-700">QR Code Reader</h1>
+            <p class="text-sm text-gray-500 mt-1">
+                Công cụ đọc và giải mã mã QR trực tuyến miễn phí
+            </p>
+        </div>
+    </header>
+
+    <main class="max-w-5xl mx-auto px-5 py-10">
+
+        <div class="grid md:grid-cols-2 gap-7">
+
+            <section class="bg-white border rounded-xl p-6 shadow-sm">
+                <h2 class="text-lg font-semibold mb-5">Quét mã QR</h2>
+
+                <div class="flex gap-2 mb-5">
+                    <button id="uploadTab" onclick="switchTab('upload')"
+                        class="flex-1 py-3 rounded-lg bg-blue-600 text-white font-medium">
+                        Tải ảnh QR
+                    </button>
+
+                    <button id="cameraTab" onclick="switchTab('camera')"
+                        class="flex-1 py-3 rounded-lg bg-gray-100 text-gray-600 font-medium">
+                        Quét bằng camera
+                    </button>
+                </div>
+
+                <div id="uploadPanel">
+                    <label for="qrFile"
+                        class="block border-2 border-dashed border-gray-300 rounded-xl p-8 text-center cursor-pointer hover:border-blue-500 transition">
+                        <div class="text-5xl mb-3">📷</div>
+                        <p class="font-medium">Chọn ảnh mã QR</p>
+                        <p class="text-sm text-gray-400 mt-2">
+                            Hỗ trợ JPG, PNG, WEBP
+                        </p>
+                        <input type="file" id="qrFile" accept="image/*" class="hidden">
+                    </label>
+
+                    <div id="previewBox" class="hidden mt-5 text-center">
+                        <img id="previewImage" class="max-h-48 mx-auto rounded-lg border object-contain"
+                            alt="Ảnh QR đã chọn">
+                        <p id="previewName" class="text-sm text-gray-500 mt-2"></p>
+                    </div>
+                </div>
+
+                <div id="cameraPanel" class="hidden">
+                    <div id="reader" class="overflow-hidden rounded-xl"></div>
+
+                    <p class="text-xs text-gray-400 mt-3 text-center">
+                        Cho phép trình duyệt truy cập camera để quét mã QR.
+                        Camera thường cần HTTPS hoặc localhost.
+                    </p>
+
+                    <button id="stopCamera" onclick="stopCamera()"
+                        class="hidden w-full mt-4 bg-red-50 text-red-600 py-3 rounded-lg hover:bg-red-100">
+                        Dừng camera
+                    </button>
+                </div>
+
+                <p id="error" class="hidden text-sm text-red-500 mt-4"></p>
+                <p id="status" class="hidden text-sm text-blue-600 mt-4"></p>
+            </section>
+
+            <section class="bg-white border rounded-xl p-6 shadow-sm">
+                <h2 class="text-lg font-semibold mb-2">Kết quả giải mã</h2>
+                <p class="text-sm text-gray-500 mb-5">
+                    Nội dung bên trong mã QR sẽ xuất hiện tại đây.
+                </p>
+
+                <div id="resultBox" class="min-h-48 bg-gray-50 border rounded-lg p-5 flex flex-col justify-center">
+                    <div class="text-center">
+                        <div class="text-5xl mb-3">🔍</div>
+                        <p class="text-gray-400 text-sm">
+                            Chưa có mã QR được quét
+                        </p>
+                    </div>
+                </div>
+
+                <div id="resultActions" class="hidden mt-4 space-y-3">
+                    <button onclick="copyResult()"
+                        class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 rounded-lg">
+                        Sao chép nội dung
+                    </button>
+
+                    <a id="openLink" href="#" target="_blank" rel="noopener noreferrer"
+                        class="hidden block text-center w-full bg-green-600 hover:bg-green-700 text-white font-medium py-3 rounded-lg">
+                        Mở liên kết
+                    </a>
+                </div>
+
+                <button onclick="resetTool()"
+                    class="w-full mt-4 bg-gray-100 hover:bg-gray-200 font-medium py-3 rounded-lg">
+                    Làm mới
+                </button>
+            </section>
+
+        </div>
+
+        <section class="mt-7 bg-blue-50 border border-blue-100 rounded-xl p-5">
+            <h3 class="font-semibold text-blue-800 mb-2">Hướng dẫn sử dụng</h3>
+            <div class="text-sm text-blue-700 space-y-2 leading-6">
+                <p>1. Chọn tải ảnh QR hoặc quét bằng camera.</p>
+                <p>2. Nếu tải ảnh, chọn hình ảnh có chứa mã QR.</p>
+                <p>3. Công cụ tự động nhận diện và giải mã mã QR.</p>
+                <p>4. Sao chép nội dung hoặc mở liên kết nếu có.</p>
+            </div>
+        </section>
+
+        <section class="mt-5 bg-amber-50 border border-amber-100 rounded-xl p-5">
+            <h3 class="font-semibold text-amber-800 mb-2">Lưu ý an toàn</h3>
+            <p class="text-sm text-amber-700 leading-6">
+                Không nên mở các đường link lạ được lấy từ mã QR.
+                Hãy kiểm tra địa chỉ website trước khi truy cập.
+            </p>
+        </section>
+
+    </main>
+
+    <footer class="text-center text-sm text-gray-500 py-7">
+        QR Code Reader - Công cụ đọc mã QR trực tuyến
+    </footer>
+
+    <script>
+        const qrFile = document.getElementById("qrFile");
+        const errorBox = document.getElementById("error");
+        const statusBox = document.getElementById("status");
+
+        let qrScanner = null;
+        let currentResult = "";
+        let currentTab = "upload";
+        let cameraRunning = false;
+
+        function switchTab(tab) {
+            clearMessages();
+
+            if (tab === currentTab && cameraRunning) return;
+
+            if (cameraRunning) {
+                stopCamera();
+            }
+
+            currentTab = tab;
+
+            const uploadPanel = document.getElementById("uploadPanel");
+            const cameraPanel = document.getElementById("cameraPanel");
+            const uploadTab = document.getElementById("uploadTab");
+            const cameraTab = document.getElementById("cameraTab");
+
+            uploadPanel.classList.toggle("hidden", tab !== "upload");
+            cameraPanel.classList.toggle("hidden", tab !== "camera");
+
+            uploadTab.className = tab === "upload"
+                ? "flex-1 py-3 rounded-lg bg-blue-600 text-white font-medium"
+                : "flex-1 py-3 rounded-lg bg-gray-100 text-gray-600 font-medium";
+
+            cameraTab.className = tab === "camera"
+                ? "flex-1 py-3 rounded-lg bg-blue-600 text-white font-medium"
+                : "flex-1 py-3 rounded-lg bg-gray-100 text-gray-600 font-medium";
+
+            if (tab === "camera") {
+                startCamera();
+            }
+        }
+
+        qrFile.addEventListener("change", async function () {
+            clearMessages();
+
+            const file = this.files[0];
+
+            if (!file) return;
+
+            if (!file.type.startsWith("image/")) {
+                showError("Vui lòng chọn một file hình ảnh hợp lệ.");
+                this.value = "";
+                return;
+            }
+
+            if (file.size > 10 * 1024 * 1024) {
+                showError("Ảnh quá lớn. Vui lòng chọn ảnh dưới 10MB.");
+                this.value = "";
+                return;
+            }
+
+            document.getElementById("previewBox").classList.remove("hidden");
+
+            const imageUrl = URL.createObjectURL(file);
+            const preview = document.getElementById("previewImage");
+
+            preview.src = imageUrl;
+            document.getElementById("previewName").textContent = file.name;
+
+            showStatus("Đang đọc mã QR...");
+
+            try {
+                const scanner = new Html5Qrcode("reader");
+                const decodedText = await scanner.scanFile(file, false);
+
+                displayResult(decodedText);
+            } catch (error) {
+                showError("Không tìm thấy mã QR trong ảnh. Vui lòng thử ảnh khác rõ nét hơn.");
+            }
+        });
+
+        async function startCamera() {
+            clearMessages();
+
+            if (!window.isSecureContext) {
+                showError("Camera cần kết nối HTTPS hoặc localhost để hoạt động.");
+                return;
+            }
+
+            try {
+                qrScanner = new Html5Qrcode("reader");
+
+                await qrScanner.start(
+                    {facingMode: "environment"},
+                    {
+                        fps: 10,
+                        qrbox: {width: 220, height: 220}
+                    },
+                    (decodedText) => {
+                        displayResult(decodedText);
+                        stopCamera();
+                    },
+                    () => { }
+                );
+
+                cameraRunning = true;
+                document.getElementById("stopCamera").classList.remove("hidden");
+                showStatus("Camera đang hoạt động. Hãy hướng mã QR vào khung quét.");
+            } catch (error) {
+                qrScanner = null;
+                cameraRunning = false;
+                showError("Không thể mở camera. Vui lòng cấp quyền truy cập camera hoặc sử dụng chức năng tải ảnh.");
+            }
+        }
+
+        async function stopCamera() {
+            if (!qrScanner || !cameraRunning) {
+                document.getElementById("stopCamera").classList.add("hidden");
+                return;
+            }
+
+            try {
+                await qrScanner.stop();
+                await qrScanner.clear();
+            } catch (error) {
+                console.log("Không thể dừng camera:", error);
+            }
+
+            qrScanner = null;
+            cameraRunning = false;
+            document.getElementById("stopCamera").classList.add("hidden");
+        }
+
+        function displayResult(text) {
+            currentResult = text;
+
+            clearMessages();
+
+            const resultBox = document.getElementById("resultBox");
+
+            resultBox.innerHTML = `
+      <div>
+        <div class="flex items-center gap-2 mb-3">
+          <span class="text-green-600 text-xl">✓</span>
+          <p class="font-semibold text-green-700">Đọc mã QR thành công!</p>
+        </div>
+        <div class="bg-white border rounded-lg p-4 break-words text-sm leading-6 whitespace-pre-wrap"></div>
+      </div>
+    `;
+
+            resultBox.querySelector(".bg-white").textContent = text;
+
+            document.getElementById("resultActions").classList.remove("hidden");
+
+            const openLink = document.getElementById("openLink");
+
+            if (isSafeUrl(text)) {
+                openLink.href = text;
+                openLink.classList.remove("hidden");
+            } else {
+                openLink.classList.add("hidden");
+                openLink.removeAttribute("href");
+            }
+
+            showStatus("Đã giải mã nội dung mã QR.");
+        }
+
+        function isSafeUrl(text) {
+            try {
+                const url = new URL(text.trim());
+                return url.protocol === "http:" || url.protocol === "https:";
+            } catch {
+                return false;
+            }
+        }
+
+        async function copyResult() {
+            if (!currentResult) return;
+
+            try {
+                await navigator.clipboard.writeText(currentResult);
+                showStatus("Đã sao chép nội dung thành công!");
+            } catch (error) {
+                showError("Không thể sao chép. Vui lòng thử lại.");
+            }
+        }
+
+        function resetTool() {
+            qrFile.value = "";
+            currentResult = "";
+
+            document.getElementById("previewBox").classList.add("hidden");
+            document.getElementById("previewImage").removeAttribute("src");
+            document.getElementById("previewName").textContent = "";
+
+            document.getElementById("resultBox").innerHTML = `
+      <div class="text-center">
+        <div class="text-5xl mb-3">🔍</div>
+        <p class="text-gray-400 text-sm">Chưa có mã QR được quét</p>
+      </div>
+    `;
+
+            document.getElementById("resultActions").classList.add("hidden");
+
+            const openLink = document.getElementById("openLink");
+            openLink.classList.add("hidden");
+            openLink.removeAttribute("href");
+
+            clearMessages();
+        }
+
+        function showError(message) {
+            errorBox.textContent = message;
+            errorBox.classList.remove("hidden");
+            statusBox.classList.add("hidden");
+        }
+
+        function showStatus(message) {
+            statusBox.textContent = message;
+            statusBox.classList.remove("hidden");
+            errorBox.classList.add("hidden");
+        }
+
+        function clearMessages() {
+            errorBox.classList.add("hidden");
+            statusBox.classList.add("hidden");
+        }
+    </script>
+
+</body>
+
+</html>
